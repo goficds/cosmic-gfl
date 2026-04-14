@@ -24,7 +24,11 @@ n           = size(ps.bus,1);
 ng          = size(ps.mac,1);
 m           = size(ps.branch,1);
 n_sh        = size(ps.shunt,1);
-ix          = get_indices(n,ng,m,n_sh,opt);
+n_gfl       = 0;
+if isfield(ps,'gfl') && ~isempty(ps.gfl)
+    n_gfl = size(ps.gfl,1);
+end
+ix          = get_indices(n,ng,m,n_sh,opt,n_gfl);
 gc          = opt.sim.gen_control; 
 angle_ref = opt.sim.angle_ref;                 % angle reference: 0:delta_sys,1:delta_coi
 COI_weight = opt.sim.COI_weight;               % weight of center of inertia
@@ -92,6 +96,50 @@ f(ix.f.Eap_dot)   = -Eaps.*Xds./(Td0ps.*Xdps)+(Xds./Xdps-1).*mac_Vmags.*cos(delt
 if gc
     [f(ix.f.Pm_dot),f(ix.f.P3_dot),df_dx_gov]               = governor_eqs_modified([Pms';P3s'],omegas_pu,ps);
     [f(ix.f.Efd_dot),f(ix.f.E1_dot),df_dx_exc,df_dy_exc]   	= exciter_eqs([Efds';E1s'],mac_Vmags,ps);
+end
+
+% --- GFL dynamics (new) ---
+if n_gfl > 0
+    gfl_on = ps.gfl(:,C.gfl.status) > 0;
+    if any(gfl_on)
+        eps_v = 1e-4; % TODO: expose as an option
+        rho = x(ix.x.rho_gfl);
+        xi_pll = x(ix.x.xi_pll);
+        xi_id = x(ix.x.xi_id);
+        xi_iq = x(ix.x.xi_iq);
+        id = x(ix.x.id_gfl);
+        iq = x(ix.x.iq_gfl);
+        gfl_bus_i = ps.bus_i(ps.gfl(:,C.gfl.bus));
+        Vgfl = Vmags(gfl_bus_i);
+        Tgfl = Thetas(gfl_bus_i);
+        delta_theta = Tgfl - rho;
+        vd = Vgfl .* cos(delta_theta);
+        vq = Vgfl .* sin(delta_theta);
+        vd_eff = max(vd,eps_v);
+
+        Pref = ps.gfl(:,C.gfl.Pref) ./ max(ps.gfl(:,C.gfl.Sn),eps_v);
+        Qref = ps.gfl(:,C.gfl.Qref) ./ max(ps.gfl(:,C.gfl.Sn),eps_v);
+        id_ref = (2/3) .* Pref ./ vd_eff;
+        iq_ref = -(2/3) .* Qref ./ vd_eff;
+        Iref = sqrt(id_ref.^2 + iq_ref.^2);
+        over_limit = Iref > ps.gfl(:,C.gfl.Imax);
+        scale = ones(n_gfl,1);
+        scale(over_limit) = ps.gfl(over_limit,C.gfl.Imax) ./ max(Iref(over_limit),eps_v);
+        id_ref = id_ref .* scale;
+        iq_ref = iq_ref .* scale;
+
+        omega_hat = omega_0 + ps.gfl(:,C.gfl.Kp_pll).*vq + ps.gfl(:,C.gfl.Ki_pll).*xi_pll;
+        f(ix.f.xi_pll_dot(gfl_on)) = vq(gfl_on);
+        f(ix.f.rho_gfl_dot(gfl_on)) = omega_hat(gfl_on);
+        f(ix.f.xi_id_dot(gfl_on)) = id_ref(gfl_on) - id(gfl_on);
+        f(ix.f.xi_iq_dot(gfl_on)) = iq_ref(gfl_on) - iq(gfl_on);
+
+        ud = ps.gfl(:,C.gfl.Kp_i).*(id_ref-id) + ps.gfl(:,C.gfl.Ki_i).*xi_id;
+        uq = ps.gfl(:,C.gfl.Kp_i).*(iq_ref-iq) + ps.gfl(:,C.gfl.Ki_i).*xi_iq;
+        Lf_eff = max(ps.gfl(:,C.gfl.Lf),eps_v);
+        f(ix.f.id_gfl_dot(gfl_on)) = (-ps.gfl(gfl_on,C.gfl.Rf).*id(gfl_on) + ud(gfl_on)) ./ Lf_eff(gfl_on);
+        f(ix.f.iq_gfl_dot(gfl_on)) = (-ps.gfl(gfl_on,C.gfl.Rf).*iq(gfl_on) + uq(gfl_on)) ./ Lf_eff(gfl_on);
+    end
 end
 
 % output df_dx and df_dy if requested
@@ -186,6 +234,62 @@ if nargout>1
         % dP3_dot_domegas
         df_dx = df_dx + sparse(ix.f.P3_dot,ix.x.omega_pu,dP3_domegas_values,ix.nx,ix.nx);
     end
+    % --- GFL df_dx dominant terms (new) ---
+    if n_gfl > 0
+        gfl_on = ps.gfl(:,C.gfl.status) > 0;
+        if any(gfl_on)
+            eps_v = 1e-4;
+            rho = x(ix.x.rho_gfl);
+            xi_pll = x(ix.x.xi_pll);
+            id = x(ix.x.id_gfl);
+            iq = x(ix.x.iq_gfl);
+            gfl_bus_i = ps.bus_i(ps.gfl(:,C.gfl.bus));
+            Vgfl = Vmags(gfl_bus_i);
+            Tgfl = Thetas(gfl_bus_i);
+            delta_theta = Tgfl - rho;
+            vd = Vgfl .* cos(delta_theta);
+            vq = Vgfl .* sin(delta_theta);
+            vd_eff = max(vd,eps_v);
+            Pref = ps.gfl(:,C.gfl.Pref) ./ max(ps.gfl(:,C.gfl.Sn),eps_v);
+            Qref = ps.gfl(:,C.gfl.Qref) ./ max(ps.gfl(:,C.gfl.Sn),eps_v);
+            id_ref = (2/3) .* Pref ./ vd_eff;
+            iq_ref = -(2/3) .* Qref ./ vd_eff;
+            Iref = sqrt(id_ref.^2 + iq_ref.^2);
+            over_limit = Iref > ps.gfl(:,C.gfl.Imax);
+            scale = ones(n_gfl,1);
+            scale(over_limit) = ps.gfl(over_limit,C.gfl.Imax) ./ max(Iref(over_limit),eps_v);
+            id_ref = id_ref .* scale;
+            iq_ref = iq_ref .* scale;
+
+            d_vq_d_rho = -Vgfl .* cos(delta_theta);
+            d_vd_d_rho = Vgfl .* sin(delta_theta);
+            d_idref_d_rho = -(2/3) .* Pref .* d_vd_d_rho ./ (vd_eff.^2);
+            d_iqref_d_rho = +(2/3) .* Qref .* d_vd_d_rho ./ (vd_eff.^2);
+
+            Lf_eff = max(ps.gfl(:,C.gfl.Lf),eps_v);
+            d_did_dot_did = -(ps.gfl(:,C.gfl.Rf) + ps.gfl(:,C.gfl.Kp_i)) ./ Lf_eff;
+            d_diq_dot_diq = -(ps.gfl(:,C.gfl.Rf) + ps.gfl(:,C.gfl.Kp_i)) ./ Lf_eff;
+            d_did_dot_dxi_id = ps.gfl(:,C.gfl.Ki_i) ./ Lf_eff;
+            d_diq_dot_dxi_iq = ps.gfl(:,C.gfl.Ki_i) ./ Lf_eff;
+            d_did_dot_drho = ps.gfl(:,C.gfl.Kp_i) .* d_idref_d_rho ./ Lf_eff;
+            d_diq_dot_drho = ps.gfl(:,C.gfl.Kp_i) .* d_iqref_d_rho ./ Lf_eff;
+
+            df_dx = df_dx + sparse(ix.f.xi_pll_dot(gfl_on),ix.x.rho_gfl(gfl_on),d_vq_d_rho(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.rho_gfl_dot(gfl_on),ix.x.rho_gfl(gfl_on),ps.gfl(gfl_on,C.gfl.Kp_pll).*d_vq_d_rho(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.rho_gfl_dot(gfl_on),ix.x.xi_pll(gfl_on),ps.gfl(gfl_on,C.gfl.Ki_pll),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.xi_id_dot(gfl_on),ix.x.id_gfl(gfl_on),-ones(sum(gfl_on),1),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.xi_iq_dot(gfl_on),ix.x.iq_gfl(gfl_on),-ones(sum(gfl_on),1),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.xi_id_dot(gfl_on),ix.x.rho_gfl(gfl_on),d_idref_d_rho(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.xi_iq_dot(gfl_on),ix.x.rho_gfl(gfl_on),d_iqref_d_rho(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.id_gfl_dot(gfl_on),ix.x.id_gfl(gfl_on),d_did_dot_did(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.id_gfl_dot(gfl_on),ix.x.xi_id(gfl_on),d_did_dot_dxi_id(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.id_gfl_dot(gfl_on),ix.x.rho_gfl(gfl_on),d_did_dot_drho(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.iq_gfl_dot(gfl_on),ix.x.iq_gfl(gfl_on),d_diq_dot_diq(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.iq_gfl_dot(gfl_on),ix.x.xi_iq(gfl_on),d_diq_dot_dxi_iq(gfl_on),ix.nx,ix.nx);
+            df_dx = df_dx + sparse(ix.f.iq_gfl_dot(gfl_on),ix.x.rho_gfl(gfl_on),d_diq_dot_drho(gfl_on),ix.nx,ix.nx);
+            % TODO: include derivatives through current limiting scaling when active.
+        end
+    end
 end
 if nargout>2
     % build df_dy (change in f wrt the algebraic variables)
@@ -230,5 +334,54 @@ if nargout>2
         % dEfd_dot_dVmag
         cols  = ix.y.Vmag(mac_bus_i);
         df_dy = df_dy + sparse(ix.f.Efd_dot,cols,dEfd_dVmag_values,ix.nx,ix.ny);
+    end
+    % --- GFL df_dy dominant terms (new) ---
+    if n_gfl > 0
+        gfl_on = ps.gfl(:,C.gfl.status) > 0;
+        if any(gfl_on)
+            eps_v = 1e-4;
+            rho = x(ix.x.rho_gfl);
+            xi_pll = x(ix.x.xi_pll); %#ok<NASGU>
+            id = x(ix.x.id_gfl); %#ok<NASGU>
+            iq = x(ix.x.iq_gfl); %#ok<NASGU>
+            gfl_bus_i = ps.bus_i(ps.gfl(:,C.gfl.bus));
+            Vgfl = Vmags(gfl_bus_i);
+            Tgfl = Thetas(gfl_bus_i);
+            delta_theta = Tgfl - rho;
+            vd = Vgfl .* cos(delta_theta);
+            vq = Vgfl .* sin(delta_theta);
+            vd_eff = max(vd,eps_v);
+            Pref = ps.gfl(:,C.gfl.Pref) ./ max(ps.gfl(:,C.gfl.Sn),eps_v);
+            Qref = ps.gfl(:,C.gfl.Qref) ./ max(ps.gfl(:,C.gfl.Sn),eps_v);
+            d_vq_dV = sin(delta_theta);
+            d_vq_dTheta = Vgfl .* cos(delta_theta);
+            d_vd_dV = cos(delta_theta);
+            d_vd_dTheta = -Vgfl .* sin(delta_theta);
+            d_idref_dV = -(2/3) .* Pref .* d_vd_dV ./ (vd_eff.^2);
+            d_iqref_dV = +(2/3) .* Qref .* d_vd_dV ./ (vd_eff.^2);
+            d_idref_dTheta = -(2/3) .* Pref .* d_vd_dTheta ./ (vd_eff.^2);
+            d_iqref_dTheta = +(2/3) .* Qref .* d_vd_dTheta ./ (vd_eff.^2);
+            Lf_eff = max(ps.gfl(:,C.gfl.Lf),eps_v);
+            d_did_dot_dV = ps.gfl(:,C.gfl.Kp_i) .* d_idref_dV ./ Lf_eff;
+            d_diq_dot_dV = ps.gfl(:,C.gfl.Kp_i) .* d_iqref_dV ./ Lf_eff;
+            d_did_dot_dTheta = ps.gfl(:,C.gfl.Kp_i) .* d_idref_dTheta ./ Lf_eff;
+            d_diq_dot_dTheta = ps.gfl(:,C.gfl.Kp_i) .* d_iqref_dTheta ./ Lf_eff;
+
+            colsV = ix.y.Vmag(gfl_bus_i(gfl_on));
+            colsT = ix.y.theta(gfl_bus_i(gfl_on));
+            df_dy = df_dy + sparse(ix.f.xi_pll_dot(gfl_on),colsV,d_vq_dV(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.xi_pll_dot(gfl_on),colsT,d_vq_dTheta(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.rho_gfl_dot(gfl_on),colsV,ps.gfl(gfl_on,C.gfl.Kp_pll).*d_vq_dV(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.rho_gfl_dot(gfl_on),colsT,ps.gfl(gfl_on,C.gfl.Kp_pll).*d_vq_dTheta(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.xi_id_dot(gfl_on),colsV,d_idref_dV(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.xi_id_dot(gfl_on),colsT,d_idref_dTheta(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.xi_iq_dot(gfl_on),colsV,d_iqref_dV(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.xi_iq_dot(gfl_on),colsT,d_iqref_dTheta(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.id_gfl_dot(gfl_on),colsV,d_did_dot_dV(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.id_gfl_dot(gfl_on),colsT,d_did_dot_dTheta(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.iq_gfl_dot(gfl_on),colsV,d_diq_dot_dV(gfl_on),ix.nx,ix.ny);
+            df_dy = df_dy + sparse(ix.f.iq_gfl_dot(gfl_on),colsT,d_diq_dot_dTheta(gfl_on),ix.nx,ix.ny);
+            % TODO: include df_dy terms from current limit scaling.
+        end
     end
 end

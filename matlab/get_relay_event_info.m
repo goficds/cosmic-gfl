@@ -25,9 +25,11 @@ for i = 1:num_relay
     elseif relay_type(i) == C.relay.ufls
         relay_ind = relay_id(i);
         location = ps.relay(relay_ind,C.relay.shunt_loc);
+    elseif relay_type(i) == C.relay.gfl_uv || relay_type(i) == C.relay.gfl_oc || relay_type(i) == C.relay.gfl_pll
+        relay_ind = relay_id(i);
+        location = ps.relay(relay_ind,C.relay.gfl_loc);
     end
     relay_location(i) = location;
     relay_index(i) = relay_ind;
 end
-
 

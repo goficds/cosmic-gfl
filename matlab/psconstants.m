@@ -13,22 +13,22 @@ if isempty(C)
     C.ISO = 4; % isolated bus
     C.PF  = 5; % participation factor gen/bus
     C.INF = Inf; % use to indicate an infinite bus
-	
+
 	%% constants used for devices that may be controllable:
 	C.NO_CONTROL = 1;
 	C.BINARY     = 2;
 	C.CONTINUOUS = 3;
-	
+
 	%% constants for branches and circuit breaker status
 	C.OPEN   = 0;
 	C.CLOSED = 1;
 	C.F_OPEN = 2; % from end open, to end closed
 	C.T_OPEN = 3; % to end open, from end closed
-	
+
 	%% other constants
 	C.EMTPY = -99999999; % used to indicate empty or un-filled values
     C.DEFAULT_VALUE = 1000; % default value of a load ($/MVA)
-	
+
 	%% bus data (same as MATPOWER, though loads are not used---remain zeros)
 	C.bu.id         = 1;
     C.bu.type       = 2;  % use with caution---can be confusing
@@ -41,7 +41,7 @@ if isempty(C)
 	C.bu.Vang       = 9;  % bus angle in degrees
 	C.bu.baseKV     = 10; % base kV (voltage at 1.0 pu)
     C.bu.zone       = 11; % zone
-	C.bu.Vmax       = 12; % minimum recommended voltage for this bus 
+	C.bu.Vmax       = 12; % minimum recommended voltage for this bus
 	C.bu.Vmin       = 13; % maximum recommended voltage for this bus
     C.bu.lam_P      = 14; % sensitivity to injection
     C.bu.lam_Q      = 15; % sensitivity to injection
@@ -52,10 +52,10 @@ if isempty(C)
     C.bu.delta_sys  = 20; % stores system angle when first bus of island
     C.bu.Vr         = 21; % real portion of complex voltage
     C.bu.Vi         = 22; % imaginary portion of complex voltage
-    
+
     % synonyms
     C.bu.locs   = [C.bu.locX C.bu.locY];
-    
+
     % column names
     C.bu.col_names = {'ID','type','Pd','Qd','Gs','Bs','area','Vmag','Vang','basekV','zone','Vmax','Vmin','lam_P','lam_Q','mu_Vx','mu_Vn','locX','locY','delta_sys'};
 
@@ -128,16 +128,16 @@ if isempty(C)
     C.ge.ramp_rate_up = 18; % ramp rate up
     C.ge.ramp_rate_down = 19; % down ramp rate
     C.ge.id = 20;
-    
+
     C.ge.col_names = {'bus','Pg','Qg','Qmax','Qmin','Vsp','mBase','status','Pmax','Pmin',...
         'mu_Px','mu_Pn','mu_Qx','mu_Qn','type','cost','part_fact','RRU','RRD','id'};
-    
+
 	C.ge.cols = 20; % min no. of cols
     % synonyms
     C.gen  = C.ge;
     C.ge.P = C.ge.Pg;
     C.ge.Q = C.ge.Qg;
-    
+
     %% values for electromechanical machine dynamics
     % The notation and per unit methods are based on Bergen & Vittal.
     C.ma.gen  = 1;  % generator number (should be one entry per generator, sequential)
@@ -160,20 +160,20 @@ if isempty(C)
     C.ma.Td0  = 16; % d-axis time constant Td0
     C.ma.Td0p = 17; % d-axis time constant T'd0 (DEBUG ME)
     C.ma.delta = 18; % delta = delta_m + theta_g
-    
+
     C.ma.col_names = {'bus','r','Xd','Xdp','Xdpp','Xq','Xqp','Xqpp','D','M',...
                       'Ea','Eap','Pm','delta_m','omega','Td0','Td0p'};
-    
+
     C.ma.cols = 17;
     % synonyms
     C.ma.Ea_mag = C.ma.Ea;
     C.mac = C.ma;
-    
-    %% exciter matrix defines the exciter model    
+
+    %% exciter matrix defines the exciter model
     C.ex.gen         =  1;                % The generator number
     C.ex.type        =  2;                % The exciter type
     C.ex.Ka          =  3;                % Regulator Gain (exciter type 2)
-    C.ex.Ta          =  4;                % Regulator time constant 
+    C.ex.Ta          =  4;                % Regulator time constant
     C.ex.Tb          =  5;                % Regulator Time constant
     C.ex.Ke          =  6;                % Exciter Gain
     C.ex.Te          =  7;                % Exciter time constant
@@ -200,7 +200,7 @@ if isempty(C)
     C.go.Pref        =  9;                % Reference Power (pu)
     C.go.Ti          =  10;               % integrator time constant (comes from Ki)
     C.go.P3          =  11;               % integrator time constant (comes from Ki)
-    
+
     C.go.cols = 11;
     C.go.col_names = {'gen','type','R','Tt','LCmax','LCmin','Pmax','Pmin','Pref','Ti','P3'};
     %synonyms
@@ -229,16 +229,42 @@ if isempty(C)
     C.sh.id     = 14; % unique id number for this shunt element.
     C.sh.frac_Q_S = 15;
     C.sh.frac_Q_I = 16;
-    C.sh.frac_Q_Z = 17; 
+    C.sh.frac_Q_Z = 17;
     C.sh.SF = 18;
 	C.sh.cols   = 18; % minimum number of columns
-    % synonyms:   
+    % synonyms:
 	C.shunt     = C.sh; % synonym
     C.sh.col_names = {'bus','P','Q','frac_S','frac_Z','status','type','value','frac_E','gamma','near_genID','id','frac_Q_S','frac_Q_I','frac_Q_Z','SF'};
-    
+
+    %% grid-following inverter (GFL) data (new)
+    C.gfl.bus       = 1;
+    C.gfl.status    = 2;
+    C.gfl.Sn        = 3;
+    C.gfl.Pref      = 4;
+    C.gfl.Qref      = 5;
+    C.gfl.Kp_pll    = 6;
+    C.gfl.Ki_pll    = 7;
+    C.gfl.Kp_i      = 8;
+    C.gfl.Ki_i      = 9;
+    C.gfl.Lf        = 10;
+    C.gfl.Rf        = 11;
+    C.gfl.Imax      = 12;
+    C.gfl.Vtrip     = 13;
+    C.gfl.wmax_dev  = 14;
+    % dynamic states
+    C.gfl.rho       = 15;
+    C.gfl.xi_pll    = 16;
+    C.gfl.xi_id     = 17;
+    C.gfl.xi_iq     = 18;
+    C.gfl.id        = 19;
+    C.gfl.iq        = 20;
+    C.gfl.idnum     = 21;
+    C.gfl.cols      = 21;
+    C.gfl.col_names = {'bus','status','Sn','Pref','Qref','Kp_pll','Ki_pll','Kp_i','Ki_i','Lf','Rf','Imax','Vtrip','wmax_dev','rho','xi_pll','xi_id','xi_iq','id','iq','idnum'};
+
     %% event-related definitions
 
-    % event types 
+    % event types
     C.event.start  = 0;
     C.event.end    = 1;
     C.event.finish = C.event.end;       % same as end
@@ -258,11 +284,12 @@ if isempty(C)
     C.event.trip_shunt   = 18;          % disconnect this shunt
     C.event.close_shunt  = 19;          % connect this shunt
     C.event.relay_trigger = 21;         % triggered a generic relay
-    C.event.em_control   = 22;          % activate emergency control 
+    C.event.em_control   = 22;          % activate emergency control
     C.event.ofgs_relay  = 50;           % triggered overfrequency generation shedding
     C.event.shed_generation = 51;       % triggered overfrequency generation sheeding
-    
-    % columns 
+    C.event.trip_gfl    = 52;           % trip a GFL unit (new)
+
+    % columns
     C.event.time       = 1; % event time in seconds
     C.event.type       = 2; % type (start and finish are required)
     C.event.bus_loc    = 3; % the bus at which the event takes place
@@ -273,12 +300,13 @@ if isempty(C)
     C.event.quantity   = 8; % for analog events, this tells us how much of the event occurs
     C.event.change_by  = 9; % choose to change quantity by percentage or by amount
     C.event.em_success = 10; % emergency control succeed if 1
-    
-    C.event.cols = 10;
-    C.event.col_names = {'time','type','bus_loc','branch_loc','gen_loc','shunt_loc','relay_loc','quantity','em_success'};
+    C.event.gfl_loc    = 11; % the gfl at which the event takes place (new)
+
+    C.event.cols = 11;
+    C.event.col_names = {'time','type','bus_loc','branch_loc','gen_loc','shunt_loc','relay_loc','quantity','change_by','em_success','gfl_loc'};
     % synonym
     C.ev = C.event;
-    
+
     %% relay matrix defines relays
     % relay types:
     %  oc: overcurrent
@@ -293,8 +321,11 @@ if isempty(C)
     C.relay.ufls = 4;
     C.relay.temp = 5;
     C.relay.ofgs = 6;
+    C.relay.gfl_uv = 7;      % gfl undervoltage trip relay (new)
+    C.relay.gfl_oc = 8;      % gfl overcurrent trip relay (new)
+    C.relay.gfl_pll = 9;     % gfl pll loss-of-lock relay (new)
     % relay columns
-    C.relay.type            = 1;    % 
+    C.relay.type            = 1;    %
     C.relay.setting1        = 2;    % setting 1
     C.relay.setting2        = 3;    % setting 2
     C.relay.threshold       = 4;    % the relay threshold. When >state, relay trips
@@ -305,6 +336,7 @@ if isempty(C)
     C.relay.branch_loc      = 8;    % the branch location for the relay
     C.relay.gen_loc         = 9;    % the gen location for the relay
     C.relay.shunt_loc       = 10;   % the shunt location for the relay
+    C.relay.gfl_loc         = 10;   % alias: gfl location stored in the location column
     C.relay.timer_state     = 11;   % the state of a simple time delay
     C.relay.timer_start     = 12;   % the time at which the timer started
     C.relay.temp_K          = 13;   % parameter K in temperature relay

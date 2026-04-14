@@ -1,6 +1,12 @@
-function index = get_indices(n_bus,n_macs,n_branches,n_shunts,opt)
-% usage: index = get_indices(n_bus,n_macs,n_branches,n_shunts,interleave)
+function index = get_indices(n_bus,n_macs,n_branches,n_shunts,opt,n_gfl)
+% usage: index = get_indices(n_bus,n_macs,n_branches,n_shunts,opt,n_gfl)
 % produces a structure that helps us to know where stuff is in x,y,f,g
+if nargin < 6
+    n_gfl = 0;
+end
+if nargin < 5
+    opt = psoptions;
+end
 
 interleave = opt.sim.interleave;    % default = 'true' or '1'
 
@@ -15,7 +21,16 @@ if interleave
 	index.x.E1 			= (5:nxsmac:nxsmac*n_macs);
 	index.x.Efd			= (6:nxsmac:nxsmac*n_macs);
     index.x.P3			= (7:nxsmac:nxsmac*n_macs);
-    index.x.temp        = (1:n_branches) + nxsmac*n_macs;
+    % --- GFL states (new) ---
+    gfl_start = nxsmac*n_macs;
+    index.x.rho_gfl     = (1:n_gfl) + gfl_start;
+    index.x.xi_pll      = (1:n_gfl) + gfl_start + n_gfl;
+    index.x.xi_id       = (1:n_gfl) + gfl_start + 2*n_gfl;
+    index.x.xi_iq       = (1:n_gfl) + gfl_start + 3*n_gfl;
+    index.x.id_gfl      = (1:n_gfl) + gfl_start + 4*n_gfl;
+    index.x.iq_gfl      = (1:n_gfl) + gfl_start + 5*n_gfl;
+    % keep branch temperature at the end
+    index.x.temp        = (1:n_branches) + gfl_start + 6*n_gfl;
 else
     index.x.delta       = (1:n_macs);
     index.x.omega_pu    = (1:n_macs) + n_macs;
@@ -24,10 +39,19 @@ else
 	index.x.E1			= (1:n_macs) + n_macs*4;
 	index.x.Efd 		= (1:n_macs) + n_macs*5; 
     index.x.P3  		= (1:n_macs) + n_macs*6;
-    index.x.temp        = (1:n_branches) + n_macs*7;
+    % --- GFL states (new) ---
+    gfl_start = n_macs*7;
+    index.x.rho_gfl     = (1:n_gfl) + gfl_start;
+    index.x.xi_pll      = (1:n_gfl) + gfl_start + n_gfl;
+    index.x.xi_id       = (1:n_gfl) + gfl_start + 2*n_gfl;
+    index.x.xi_iq       = (1:n_gfl) + gfl_start + 3*n_gfl;
+    index.x.id_gfl      = (1:n_gfl) + gfl_start + 4*n_gfl;
+    index.x.iq_gfl      = (1:n_gfl) + gfl_start + 5*n_gfl;
+    % keep branch temperature at the end
+    index.x.temp        = (1:n_branches) + gfl_start + 6*n_gfl;
 end
 
-index.nx            = nxsmac*n_macs + n_branches;
+index.nx            = nxsmac*n_macs + 6*n_gfl + n_branches;
 % index.nx            = nxsmac*n_macs;
 index.x.omega       = index.x.omega_pu; 
 
@@ -39,6 +63,13 @@ index.f.Eap_dot   = index.x.Eap;
 index.f.E1_dot 	  = index.x.E1;
 index.f.Efd_dot   = index.x.Efd;
 index.f.P3_dot    = index.x.P3;
+% --- GFL differential equations (new) ---
+index.f.rho_gfl_dot = index.x.rho_gfl;
+index.f.xi_pll_dot  = index.x.xi_pll;
+index.f.xi_id_dot   = index.x.xi_id;
+index.f.xi_iq_dot   = index.x.xi_iq;
+index.f.id_gfl_dot  = index.x.id_gfl;
+index.f.iq_gfl_dot  = index.x.iq_gfl;
 % index.f.temp_dot  = index.x.temp;
 % index.nf = index.nx;
 index.nf = index.nx - n_branches;   % exclude the fake differential variable, temperature
@@ -89,5 +120,9 @@ index.re.oc = (1:n_branches) + n_branches;
 index.re.uvls = (1:n_shunts) + n_branches + n_branches;
 index.re.ufls = (1:n_shunts)  + n_branches + n_branches + n_shunts;
 index.re.dist = (1:n_branches) + n_branches + n_branches + n_shunts + n_shunts;
-index.re.nrelay = 3*n_branches + 2*n_shunts;
+% --- GFL relay blocks (new) ---
+index.re.gfl_uv = (1:n_gfl) + 3*n_branches + 2*n_shunts;
+index.re.gfl_oc = (1:n_gfl) + 3*n_branches + 2*n_shunts + n_gfl;
+index.re.gfl_pll = (1:n_gfl) + 3*n_branches + 2*n_shunts + 2*n_gfl;
+index.re.nrelay = 3*n_branches + 2*n_shunts + 3*n_gfl;
 return
