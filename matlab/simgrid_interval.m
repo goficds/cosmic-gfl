@@ -26,6 +26,10 @@ n_gfl       = 0;
 if isfield(ps,'gfl') && ~isempty(ps.gfl)
     n_gfl = size(ps.gfl,1);
 end
+trip_gfl_only_island = false;
+if isfield(opt,'sim') && isfield(opt.sim,'trip_gfl_only_island')
+    trip_gfl_only_island = logical(opt.sim.trip_gfl_only_island);
+end
 j = 1i;
 
 angle_ref = opt.sim.angle_ref;                 % angle reference: 0:delta_sys,1:delta_coi
@@ -75,7 +79,10 @@ else
     % --- first-version GFL-only island survivability rule (new) ---
     % Conservative approximation: if there is load and no synchronous machines,
     % but there are online GFL units, trip GFLs and disable island load.
-    if n_macs == 0 && n_gfl > 0 && any(ps.gfl(:,C.gfl.status)>0)
+    if trip_gfl_only_island && n_macs == 0 && n_gfl > 0 && any(ps.gfl(:,C.gfl.status)>0)
+        % first-version conservative approximation (optional):
+        % for GFL-only islands, trip all online GFLs and disable loads.
+        % this is not a strict physical model; it is a stability guardrail.
         if ~isempty(ps.shunt)
             ps.shunt(:,C.sh.factor) = 0;
             ps.shunt(:,C.sh.status) = 0;

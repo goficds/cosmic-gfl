@@ -58,6 +58,7 @@ opt.sim.uvls_delta = 0.25;     % the fraction of load that is shed during simula
 opt.sim.ufls_limit = 0.95;     % threshold at which under frequency load shedding occurs
 opt.sim.ufls_delta = 0.25;     % load shedding fraction
 opt.sim.zone1_distance = 0.9;  % zone 1 default distance (90% of line impedance)
+opt.sim.trip_gfl_only_island = false; % optional conservative first-version GFL-only island tripping
 
 % legacy
 opt.simdc = opt.sim;

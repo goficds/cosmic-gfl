@@ -5,14 +5,14 @@ function [x,y] = get_xy(ps,opt)
 % get some constants
 C  = psconstants;
 n  = size(ps.bus,1);
-ng = size(ps.gen,1);
+n_macs = size(ps.mac,1);
 m  = size(ps.branch,1);
 n_sh = size(ps.shunt,1);
 n_gfl = 0;
 if isfield(ps,'gfl') && ~isempty(ps.gfl)
     n_gfl = size(ps.gfl,1);
 end
-ix   = get_indices(n,ng,m,n_sh,opt,n_gfl);
+ix   = get_indices(n,n_macs,m,n_sh,opt,n_gfl);
 
 angle_ref = opt.sim.angle_ref;                 % angle reference: 0:delta_sys,1:delta_coi
 COI_weight = opt.sim.COI_weight;               % weight of center of inertia
