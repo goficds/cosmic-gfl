@@ -130,7 +130,8 @@ if n_gfl > 0
 
         omega_hat = omega_0 + ps.gfl(:,C.gfl.Kp_pll).*vq + ps.gfl(:,C.gfl.Ki_pll).*xi_pll;
         f(ix.f.xi_pll_dot(gfl_on)) = vq(gfl_on);
-        f(ix.f.rho_gfl_dot(gfl_on)) = omega_hat(gfl_on);
+        % GFL PLL angle in the synchronous reference frame (use frequency deviation).
+        f(ix.f.rho_gfl_dot(gfl_on)) = omega_hat(gfl_on) - omega_0;
         f(ix.f.xi_id_dot(gfl_on)) = id_ref(gfl_on) - id(gfl_on);
         f(ix.f.xi_iq_dot(gfl_on)) = iq_ref(gfl_on) - iq(gfl_on);
 
