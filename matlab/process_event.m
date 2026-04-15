@@ -51,7 +51,12 @@ switch event(C.ev.type)
         ps.branch(br_set,C.br.status) = 0;
         % trip gens and shunts at this bus
         ps.gen(ps.gen(:,1)==bus_no,C.gen.status) = 0;
-        ps.shunt(ps.shunt(:,1)==bus_no,C.shunt.status) = 0;
+        sh_bus = ps.shunt(:,1)==bus_no;
+        ps.shunt(sh_bus,C.shunt.status) = 0;
+        % ensure tripped-bus load is fully removed from algebraic equations
+        ps.shunt(sh_bus,C.sh.factor) = 0;
+        ps.shunt(sh_bus,C.sh.P) = 0;
+        ps.shunt(sh_bus,C.sh.Q) = 0;
         % --- GFL handling (new): trip GFLs connected to a tripped bus ---
         if isfield(ps,'gfl') && ~isempty(ps.gfl)
             gfl_bus = ps.gfl(:,C.gfl.bus)==bus_no;

@@ -46,6 +46,24 @@ br_status           = ps.branch(:,C.br.status) == C.CLOSED;
 is_first_subgraph   = findSubGraphs(ps.bus(:,C.bu.id), ps.branch(br_status,C.br.f:C.br.t),1);
 
 if ~all(is_first_subgraph)
+    % If the partition is only due to isolated buses with no active devices/loads,
+    % avoid recursive island simulation and continue with the full system.
+    iso_bus_no = ps.bus(~is_first_subgraph,C.bu.id);
+    if ~isempty(iso_bus_no)
+        iso_has_gen = any(ismember(ps.gen(ps.gen(:,C.ge.status)~=0,1), iso_bus_no));
+        iso_has_mac = any(ismember(ps.mac(:,1), iso_bus_no));
+        iso_has_gfl = isfield(ps,'gfl') && ~isempty(ps.gfl) && any(ismember(ps.gfl(ps.gfl(:,C.gfl.status)>0,C.gfl.bus), iso_bus_no));
+        iso_has_load = ~isempty(ps.shunt) && any(ismember(ps.shunt(:,1), iso_bus_no) & (ps.shunt(:,C.sh.factor) > 0));
+        if ~iso_has_gen && ~iso_has_mac && ~iso_has_gfl && ~iso_has_load
+            if opt.verbose
+                fprintf('  t = %.4f: Partitioned network contains only isolated inactive buses; continuing without island recursion.\n',t);
+            end
+            is_first_subgraph(:) = true;
+        end
+    end
+end
+
+if ~all(is_first_subgraph)
     % the network partitioned
     if opt.verbose
         fprintf('  t = %.4f: The network partitioned into two islands...\n',t);
