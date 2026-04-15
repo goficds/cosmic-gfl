@@ -288,6 +288,7 @@ if isempty(C)
     C.event.ofgs_relay  = 50;           % triggered overfrequency generation shedding
     C.event.shed_generation = 51;       % triggered overfrequency generation sheeding
     C.event.trip_gfl    = 52;           % trip a GFL unit (new)
+    C.event.gfl_set_pref = 53;          % set GFL active-power reference (MW); quantity=new Pref, gfl_loc=idnum (new)
 
     % columns
     C.event.time       = 1; % event time in seconds

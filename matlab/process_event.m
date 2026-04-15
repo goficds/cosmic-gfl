@@ -88,6 +88,22 @@ switch event(C.ev.type)
                 if verbose, fprintf('  t = %.4f: GFL %d tripped...\n',t,gfl_id); end
             end
         end
+
+    case C.ev.gfl_set_pref
+        if isfield(ps,'gfl') && ~isempty(ps.gfl)
+            gfl_id = event(C.ev.gfl_loc);
+            new_pref = event(C.ev.quantity);
+            if isfield(ps,'gfl_i') && ~isempty(ps.gfl_i) && gfl_id <= size(ps.gfl_i,1)
+                gfl_ix = ps.gfl_i(gfl_id);
+            else
+                gfl_ix = find(ps.gfl(:,C.gfl.idnum)==gfl_id,1,'first');
+            end
+            if ~isempty(gfl_ix) && gfl_ix>0 && ps.gfl(gfl_ix,C.gfl.status)~=0
+                ps.gfl(gfl_ix,C.gfl.Pref) = new_pref;
+                discrete = true;
+                if verbose, fprintf('  t = %.4f: GFL %d Pref set to %.4f MW...\n',t,gfl_id,new_pref); end
+            end
+        end
         
     case C.ev.shed_load
         shunt_id = event(C.ev.shunt_loc);
