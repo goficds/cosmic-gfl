@@ -52,6 +52,13 @@ switch event(C.ev.type)
         % trip gens and shunts at this bus
         ps.gen(ps.gen(:,1)==bus_no,C.gen.status) = 0;
         ps.shunt(ps.shunt(:,1)==bus_no,C.shunt.status) = 0;
+        % --- GFL handling (new): trip GFLs connected to a tripped bus ---
+        if isfield(ps,'gfl') && ~isempty(ps.gfl)
+            gfl_bus = ps.gfl(:,C.gfl.bus)==bus_no;
+            ps.gfl(gfl_bus,C.gfl.status) = 0;
+            ps.gfl(gfl_bus,C.gfl.Pref) = 0;
+            ps.gfl(gfl_bus,C.gfl.Qref) = 0;
+        end
         discrete = true;
         if verbose, fprintf('  t = %.4f: Bus %d tripped...\n',t,bus_no); end
         
@@ -64,6 +71,38 @@ switch event(C.ev.type)
             ps.gen(gen_ix,C.Qg) = 0;
             if verbose, fprintf('  t = %.4f: Gen %d tripped...\n',t,gen_id); end
             discrete = true;
+        end
+    case C.ev.trip_gfl
+        if isfield(ps,'gfl') && ~isempty(ps.gfl)
+            gfl_id = event(C.ev.gfl_loc);
+            if isfield(ps,'gfl_i') && ~isempty(ps.gfl_i) && gfl_id <= size(ps.gfl_i,1)
+                gfl_ix = ps.gfl_i(gfl_id);
+            else
+                gfl_ix = find(ps.gfl(:,C.gfl.idnum)==gfl_id,1,'first');
+            end
+            if ~isempty(gfl_ix) && gfl_ix>0 && ps.gfl(gfl_ix,C.gfl.status)~=0
+                ps.gfl(gfl_ix,C.gfl.status) = 0;
+                ps.gfl(gfl_ix,C.gfl.Pref) = 0;
+                ps.gfl(gfl_ix,C.gfl.Qref) = 0;
+                discrete = true;
+                if verbose, fprintf('  t = %.4f: GFL %d tripped...\n',t,gfl_id); end
+            end
+        end
+
+    case C.ev.gfl_set_pref
+        if isfield(ps,'gfl') && ~isempty(ps.gfl)
+            gfl_id = event(C.ev.gfl_loc);
+            new_pref = event(C.ev.quantity);
+            if isfield(ps,'gfl_i') && ~isempty(ps.gfl_i) && gfl_id <= size(ps.gfl_i,1)
+                gfl_ix = ps.gfl_i(gfl_id);
+            else
+                gfl_ix = find(ps.gfl(:,C.gfl.idnum)==gfl_id,1,'first');
+            end
+            if ~isempty(gfl_ix) && gfl_ix>0 && ps.gfl(gfl_ix,C.gfl.status)~=0
+                ps.gfl(gfl_ix,C.gfl.Pref) = new_pref;
+                discrete = true;
+                if verbose, fprintf('  t = %.4f: GFL %d Pref set to %.4f MW...\n',t,gfl_id,new_pref); end
+            end
         end
         
     case C.ev.shed_load

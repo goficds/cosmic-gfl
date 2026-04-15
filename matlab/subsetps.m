@@ -39,6 +39,14 @@ if isfield(ps,'shunt')
     sh_keep_nos = ps.shunt(sh_keep,C.sh.bus);
     ps.shunt = ps.shunt(sh_keep,:);
 end
+% subset gfl units (new)
+if isfield(ps,'gfl') && ~isempty(ps.gfl)
+    gfl_keep = ismember(ps.gfl(:,C.gfl.bus),bus_nos);
+    gfl_keep_nos = ps.gfl(gfl_keep,C.gfl.idnum);
+    ps.gfl = ps.gfl(gfl_keep,:);
+else
+    gfl_keep_nos = [];
+end
 
 % subset branch relays
 if isfield(ps,'relay')
@@ -46,7 +54,8 @@ if isfield(ps,'relay')
     re_keep_bu = ismember(ps.relay(:,C.re.bus_loc),bus_nos);
     re_keep_ge = ismember(ps.relay(:,C.re.gen_loc),ge_keep_nos);
     re_keep_sh = ismember(ps.relay(:,C.re.shunt_loc),sh_keep_nos);
-    re_keep = re_keep_br | re_keep_bu | re_keep_ge | re_keep_sh;
+    re_keep_gfl = ismember(ps.relay(:,C.re.gfl_loc),gfl_keep_nos);
+    re_keep = re_keep_br | re_keep_bu | re_keep_ge | re_keep_sh | re_keep_gfl;
     ps.relay = ps.relay(re_keep,:);
 end
 nge = size(ps.gen);
@@ -65,5 +74,8 @@ end
 if ~isempty(ps.shunt)
     ps.shunt_i = sparse(ps.shunt(:,1),1,(1:nsh)',max_bus_no,1);
 end
-
+if isfield(ps,'gfl') && ~isempty(ps.gfl)
+    max_gfl_no = max(ps.gfl(:,C.gfl.idnum));
+    ps.gfl_i = sparse(ps.gfl(:,C.gfl.idnum),1,(1:size(ps.gfl,1))',max_gfl_no,1);
+end
 

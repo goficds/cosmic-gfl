@@ -21,7 +21,11 @@ n           = size(ps.bus,1);
 ng          = size(ps.mac,1);
 m           = size(ps.branch,1);
 n_sh        = size(ps.shunt,1);
-ix          = get_indices(n,ng,m,n_sh,opt);
+n_gfl       = 0;
+if isfield(ps,'gfl') && ~isempty(ps.gfl)
+    n_gfl = size(ps.gfl,1);
+end
+ix          = get_indices(n,ng,m,n_sh,opt,n_gfl);
 
 angle_ref = opt.sim.angle_ref;                 % angle reference: 0:delta_sys,1:delta_coi
 COI_weight = opt.sim.COI_weight;               % weight of center of inertia
@@ -113,9 +117,31 @@ Qgen = (Eaps.*mac_Vmags./Xdps).*cos(delta_m) - ...
 mac_P = sparse(mac_bus_i,1,Pgen,n,1);
 mac_Q = sparse(mac_bus_i,1,Qgen,n,1);
 
+% --- GFL injections (new) ---
+gfl_P = sparse([],[],[],n,1);
+gfl_Q = sparse([],[],[],n,1);
+if n_gfl > 0
+    gfl_on = ps.gfl(:,C.gfl.status) > 0;
+    if any(gfl_on)
+        rho = x(ix.x.rho_gfl);
+        id_gfl = x(ix.x.id_gfl);
+        iq_gfl = x(ix.x.iq_gfl);
+        gfl_bus_i = ps.bus_i(ps.gfl(:,C.gfl.bus));
+        Vg = Vmags(gfl_bus_i);
+        Tg = Thetas(gfl_bus_i);
+        dth = Tg - rho;
+        vd = Vg .* cos(dth);
+        vq = Vg .* sin(dth);
+        Pgfl = 1.5 .* (vd .* id_gfl + vq .* iq_gfl);
+        Qgfl = 1.5 .* (vq .* id_gfl - vd .* iq_gfl);
+        gfl_P = sparse(gfl_bus_i(gfl_on),1,Pgfl(gfl_on),n,1);
+        gfl_Q = sparse(gfl_bus_i(gfl_on),1,Qgfl(gfl_on),n,1);
+    end
+end
+
 % output
-g(ix.g.P)       = P_trans - mac_P + Pd_bus;
-g(ix.g.Q)       = Q_trans - mac_Q + Qd_bus;
+g(ix.g.P)       = P_trans - mac_P - gfl_P + Pd_bus;
+g(ix.g.Q)       = Q_trans - mac_Q - gfl_Q + Qd_bus;
 if ~angle_ref
     g(ix.g.slack)   = Thetas(is_slack) - Theta_slack;
 end
@@ -165,6 +191,37 @@ if nargout>1
     dg_dx = dg_dx + sparse(Qg_rows_loc,delta_loc,-dQg_ddelta_values,ix.ny,ix.nx);
     % dQg_dEa
     dg_dx = dg_dx + sparse(Qg_rows,ix.x.Eap,-dQg_dEa_values,ix.ny,ix.nx);
+    % --- GFL dg_dx dominant terms (new) ---
+    if n_gfl > 0
+        gfl_on = ps.gfl(:,C.gfl.status) > 0;
+        if any(gfl_on)
+            rho = x(ix.x.rho_gfl);
+            id_gfl = x(ix.x.id_gfl);
+            iq_gfl = x(ix.x.iq_gfl);
+            gfl_bus_i = ps.bus_i(ps.gfl(:,C.gfl.bus));
+            Vg = Vmags(gfl_bus_i);
+            Tg = Thetas(gfl_bus_i);
+            dth = Tg - rho;
+            vd = Vg .* cos(dth);
+            vq = Vg .* sin(dth);
+            d_vd_drho = Vg .* sin(dth);
+            d_vq_drho = -Vg .* cos(dth);
+            dPg_drho = 1.5 .* (d_vd_drho.*id_gfl + d_vq_drho.*iq_gfl);
+            dQg_drho = 1.5 .* (d_vq_drho.*id_gfl - d_vd_drho.*iq_gfl);
+            dPg_did = 1.5 .* vd;
+            dPg_diq = 1.5 .* vq;
+            dQg_did = 1.5 .* vq;
+            dQg_diq = -1.5 .* vd;
+            rowsP = ix.g.P(gfl_bus_i(gfl_on));
+            rowsQ = ix.g.Q(gfl_bus_i(gfl_on));
+            dg_dx = dg_dx + sparse(rowsP,ix.x.rho_gfl(gfl_on),-dPg_drho(gfl_on),ix.ny,ix.nx);
+            dg_dx = dg_dx + sparse(rowsP,ix.x.id_gfl(gfl_on),-dPg_did(gfl_on),ix.ny,ix.nx);
+            dg_dx = dg_dx + sparse(rowsP,ix.x.iq_gfl(gfl_on),-dPg_diq(gfl_on),ix.ny,ix.nx);
+            dg_dx = dg_dx + sparse(rowsQ,ix.x.rho_gfl(gfl_on),-dQg_drho(gfl_on),ix.ny,ix.nx);
+            dg_dx = dg_dx + sparse(rowsQ,ix.x.id_gfl(gfl_on),-dQg_did(gfl_on),ix.ny,ix.nx);
+            dg_dx = dg_dx + sparse(rowsQ,ix.x.iq_gfl(gfl_on),-dQg_diq(gfl_on),ix.ny,ix.nx);
+        end
+    end
 end
 if nargout>2
     % assumes that the Ybus in ps is updated based on the discrete state of the system
@@ -214,6 +271,37 @@ if nargout>2
                          mac_Vmags.^2.*(-sin(2*delta_m)./Xdps + sin(2*delta_m)./Xqs);
     dg_dy = dg_dy + sparse(ix.g.P(mac_bus_i),ix.y.theta(mac_bus_i),+dPg_dtheta_values,ix.ny,ix.ny);
     dg_dy = dg_dy + sparse(ix.g.Q(mac_bus_i),ix.y.theta(mac_bus_i),+dQg_dtheta_values,ix.ny,ix.ny);
+    % --- GFL dg_dy dominant terms (new) ---
+    if n_gfl > 0
+        gfl_on = ps.gfl(:,C.gfl.status) > 0;
+        if any(gfl_on)
+            rho = x(ix.x.rho_gfl);
+            id_gfl = x(ix.x.id_gfl);
+            iq_gfl = x(ix.x.iq_gfl);
+            gfl_bus_i = ps.bus_i(ps.gfl(:,C.gfl.bus));
+            Vg = Vmags(gfl_bus_i);
+            Tg = Thetas(gfl_bus_i);
+            dth = Tg - rho;
+            vd = Vg .* cos(dth);
+            vq = Vg .* sin(dth);
+            d_vd_dV = cos(dth);
+            d_vq_dV = sin(dth);
+            d_vd_dTheta = -Vg .* sin(dth);
+            d_vq_dTheta = Vg .* cos(dth);
+            dPg_dV = 1.5 .* (d_vd_dV.*id_gfl + d_vq_dV.*iq_gfl);
+            dQg_dV = 1.5 .* (d_vq_dV.*id_gfl - d_vd_dV.*iq_gfl);
+            dPg_dTheta = 1.5 .* (d_vd_dTheta.*id_gfl + d_vq_dTheta.*iq_gfl);
+            dQg_dTheta = 1.5 .* (d_vq_dTheta.*id_gfl - d_vd_dTheta.*iq_gfl);
+            rowsP = ix.g.P(gfl_bus_i(gfl_on));
+            rowsQ = ix.g.Q(gfl_bus_i(gfl_on));
+            colsV = ix.y.Vmag(gfl_bus_i(gfl_on));
+            colsT = ix.y.theta(gfl_bus_i(gfl_on));
+            dg_dy = dg_dy + sparse(rowsP,colsV,-dPg_dV(gfl_on),ix.ny,ix.ny);
+            dg_dy = dg_dy + sparse(rowsP,colsT,-dPg_dTheta(gfl_on),ix.ny,ix.ny);
+            dg_dy = dg_dy + sparse(rowsQ,colsV,-dQg_dV(gfl_on),ix.ny,ix.ny);
+            dg_dy = dg_dy + sparse(rowsQ,colsT,-dQg_dTheta(gfl_on),ix.ny,ix.ny);
+        end
+    end
     
     % fix the derivatives with [Z]IPE contributions
     dg_dy = dg_dy + sparse(ix.g.P(load_locs),ix.y.Vmag(load_locs), 2*Pd_base.*Vd.*ps.shunt(:,C.sh.frac_Z),ix.ny,ix.ny);

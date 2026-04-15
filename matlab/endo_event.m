@@ -14,6 +14,7 @@ temp_threshold          = ps.relay(ix.re.temp,C.re.threshold); % temperature rel
 temp_K                  = ps.relay(ix.re.temp,C.re.temp_K);    % parameter K for temperature relay
 temp_R                  = ps.relay(ix.re.temp,C.re.temp_R);    % parameter R for temperature relay
 SMALL_EPS = 1e-12;
+omega_0 = 2*pi*ps.frequency;
 
 % extract some info from the inputs
 x               = xy(1:ix.nx); 
@@ -63,6 +64,34 @@ value = [temp_threshold - Temperature;      % active temperature relay
  Vmag_sh              - Vmag_threshold;     % active undervoltage load shedding
  load_freq            - omega_pu_threshold; % active underfrequency load shedding
  dist_zone1_threshold - y_apparent];        % active zone 1 distance relay
+
+% --- GFL relay event triggers (new) ---
+if isfield(ps,'gfl') && ~isempty(ps.gfl) && isfield(ix.re,'gfl_pll') && ~isempty(ix.re.gfl_pll) ...
+        && size(ps.relay,1) >= ix.re.gfl_pll(end)
+    n_gfl = size(ps.gfl,1);
+    gfl_on = ps.gfl(:,C.gfl.status) > 0;
+    if n_gfl > 0
+        rho = x(ix.x.rho_gfl);
+        xi_pll = x(ix.x.xi_pll);
+        id = x(ix.x.id_gfl);
+        iq = x(ix.x.iq_gfl);
+        gfl_bus_i = ps.bus_i(ps.gfl(:,C.gfl.bus));
+        Vgfl = Vmags(gfl_bus_i);
+        Tgfl = Thetas(gfl_bus_i);
+        vq_gfl = Vgfl .* sin(Tgfl-rho);
+        omega_hat = omega_0 + ps.gfl(:,C.gfl.Kp_pll).*vq_gfl + ps.gfl(:,C.gfl.Ki_pll).*xi_pll;
+        pll_dev = abs(omega_hat-omega_0);
+        Igfl = sqrt(id.^2 + iq.^2);
+        val_uv = Vgfl - ps.gfl(:,C.gfl.Vtrip);
+        val_oc = ps.gfl(:,C.gfl.Imax) - Igfl;
+        val_pll = ps.gfl(:,C.gfl.wmax_dev) - pll_dev;
+        % keep offline devices away from triggering
+        val_uv(~gfl_on) = 10;
+        val_oc(~gfl_on) = 10;
+        val_pll(~gfl_on) = 10;
+        value = [value; val_uv; val_oc; val_pll];
+    end
+end
 
 % for relays that have already tripped set value to be in a safe range
 is_tripped = ps.relay(:,C.re.tripped)==1;

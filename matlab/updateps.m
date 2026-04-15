@@ -26,6 +26,13 @@ end
 if size(ps.shunt,2) < C.sh.cols
     ps.shunt = addcolumns(ps.shunt,C.sh.cols);
 end
+% gfl
+if ~isfield(ps,'gfl')
+    ps.gfl = [];
+end
+if size(ps.gfl,2) < C.gfl.cols
+    ps.gfl = addcolumns(ps.gfl,C.gfl.cols);
+end
 
 %% make sure that the system has a base frequency
 if ~isfield(ps,'frequency')
@@ -105,6 +112,21 @@ if any( needs_id )
     ps.shunt(needs_id,C.sh.id) = max_id + (1:sum(needs_id))';
 end
 ps.shunt_i = sparse(ps.shunt(:,1),1,(1:size(ps.shunt,1))',max_bus_no,1);
+
+%% check gfl data (new)
+if ~isempty(ps.gfl)
+    ps.gfl(ps.gfl(:,C.gfl.status)==0,C.gfl.Pref) = 0;
+    ps.gfl(ps.gfl(:,C.gfl.status)==0,C.gfl.Qref) = 0;
+    needs_id = ps.gfl(:,C.gfl.idnum) <= 0;
+    if any(needs_id)
+        max_id = max(max(ps.gfl(:,C.gfl.idnum)),0);
+        ps.gfl(needs_id,C.gfl.idnum) = max_id + (1:sum(needs_id))';
+    end
+    max_gfl_no = max(ps.gfl(:,C.gfl.idnum));
+    ps.gfl_i = sparse(ps.gfl(:,C.gfl.idnum),1,(1:size(ps.gfl,1))',max_gfl_no,1);
+else
+    ps.gfl_i = sparse([],[],[],0,1);
+end
 
 %% addcolumns function
 function M = addcolumns(M,ncols)

@@ -5,10 +5,14 @@ function [x,y] = get_xy(ps,opt)
 % get some constants
 C  = psconstants;
 n  = size(ps.bus,1);
-ng = size(ps.gen,1);
+n_macs = size(ps.mac,1);
 m  = size(ps.branch,1);
 n_sh = size(ps.shunt,1);
-ix   = get_indices(n,ng,m,n_sh,opt);
+n_gfl = 0;
+if isfield(ps,'gfl') && ~isempty(ps.gfl)
+    n_gfl = size(ps.gfl,1);
+end
+ix   = get_indices(n,n_macs,m,n_sh,opt,n_gfl);
 
 angle_ref = opt.sim.angle_ref;                 % angle reference: 0:delta_sys,1:delta_coi
 COI_weight = opt.sim.COI_weight;               % weight of center of inertia
@@ -52,6 +56,15 @@ x(ix.x.E1) 		 = E1;
 x(ix.x.Efd) 	 = Efd;
 x(ix.x.P3) 	     = P3;
 x(ix.x.temp)     = Temperature;
+% --- GFL states (new) ---
+if n_gfl > 0
+    x(ix.x.rho_gfl) = ps.gfl(:,C.gfl.rho);
+    x(ix.x.xi_pll)  = ps.gfl(:,C.gfl.xi_pll);
+    x(ix.x.xi_id)   = ps.gfl(:,C.gfl.xi_id);
+    x(ix.x.xi_iq)   = ps.gfl(:,C.gfl.xi_iq);
+    x(ix.x.id_gfl)  = ps.gfl(:,C.gfl.id);
+    x(ix.x.iq_gfl)  = ps.gfl(:,C.gfl.iq);
+end
 
 % build y
 y = zeros(ix.ny,1);

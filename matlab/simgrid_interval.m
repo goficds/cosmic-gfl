@@ -22,6 +22,14 @@ n           = size(ps.bus,1);
 n_macs      = size(ps.mac,1);
 m           = size(ps.branch,1);
 n_shunts    = size(ps.shunt,1);
+n_gfl       = 0;
+if isfield(ps,'gfl') && ~isempty(ps.gfl)
+    n_gfl = size(ps.gfl,1);
+end
+trip_gfl_only_island = false;
+if isfield(opt,'sim') && isfield(opt.sim,'trip_gfl_only_island')
+    trip_gfl_only_island = logical(opt.sim.trip_gfl_only_island);
+end
 j = 1i;
 
 angle_ref = opt.sim.angle_ref;                 % angle reference: 0:delta_sys,1:delta_coi
@@ -58,7 +66,7 @@ if ~all(is_first_subgraph)
     % superset_odeout did not update
 %     [ps.Ybus,ps.Yf,ps.Yt,ps.Yft,ps.sh_ft] = getYbus(ps,false);
     %%%%%%%%%%%%%%%%%%%%%%%
-elseif (n_macs == 0 || n_shunts == 0 || (ps.shunt(:,C.sh.P)'*ps.shunt(:,C.sh.factor) == 0) || size(ps.bus(:,1),1) == 1)
+elseif ((n_macs == 0 && n_gfl == 0) || n_shunts == 0 || (ps.shunt(:,C.sh.P)'*ps.shunt(:,C.sh.factor) == 0) || size(ps.bus(:,1),1) == 1)
     % there is no generation or load in this network, or it is just one disconnected bus
     t_out           = t;
     X               = nan(size(x0));
@@ -68,8 +76,31 @@ elseif (n_macs == 0 || n_shunts == 0 || (ps.shunt(:,C.sh.P)'*ps.shunt(:,C.sh.fac
     Y               = nan(size(y0));
     if ~isempty(ps.shunt), ps.shunt(:,C.sh.factor) = 0; end
 else
+    % --- first-version GFL-only island survivability rule (new) ---
+    % Conservative approximation: if there is load and no synchronous machines,
+    % but there are online GFL units, trip GFLs and disable island load.
+    if trip_gfl_only_island && n_macs == 0 && n_gfl > 0 && any(ps.gfl(:,C.gfl.status)>0)
+        % first-version conservative approximation (optional):
+        % for GFL-only islands, trip all online GFLs and disable loads.
+        % this is not a strict physical model; it is a stability guardrail.
+        if ~isempty(ps.shunt)
+            ps.shunt(:,C.sh.factor) = 0;
+            ps.shunt(:,C.sh.status) = 0;
+        end
+        ps.gfl(:,C.gfl.status) = 0;
+        ps.gfl(:,C.gfl.Pref) = 0;
+        ps.gfl(:,C.gfl.Qref) = 0;
+        t_out = t;
+        X = nan(size(x0));
+        if isempty(X), X = [X; nan(1,size(X,2))]; end
+        Y = nan(size(y0));
+        if opt.verbose
+            fprintf('  t = %.4f: GFL-only island detected; tripped all GFLs and shed load (first-version rule).\n',t);
+        end
+        return
+    end
     % nothing special (for now), try to integrate the network DAEs from t to t_next
-    ix          = get_indices(n,n_macs,m,n_shunts,opt);
+    ix          = get_indices(n,n_macs,m,n_shunts,opt,n_gfl);
     mac_bus_i   = ps.bus_i(ps.mac(:,1));
     temp_ref    = 0;
 
@@ -179,6 +210,15 @@ else
         ps.bus(:,C.bus.Vmag)        = y_end(ix.y.Vmag);
         ps.bus(:,C.bus.Vang)        = y_end(ix.y.theta)*180/pi;
         ps.relay(ix.re.temp,C.re.state_a) = x_end(ix.x.temp);
+        if n_gfl > 0
+            % --- write back GFL dynamic states (new) ---
+            ps.gfl(:,C.gfl.rho) = x_end(ix.x.rho_gfl);
+            ps.gfl(:,C.gfl.xi_pll) = x_end(ix.x.xi_pll);
+            ps.gfl(:,C.gfl.xi_id) = x_end(ix.x.xi_id);
+            ps.gfl(:,C.gfl.xi_iq) = x_end(ix.x.xi_iq);
+            ps.gfl(:,C.gfl.id) = x_end(ix.x.id_gfl);
+            ps.gfl(:,C.gfl.iq) = x_end(ix.x.iq_gfl);
+        end
         
         % branch results
         Vmag = y_end(ix.y.Vmag);

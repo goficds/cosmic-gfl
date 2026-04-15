@@ -5,6 +5,10 @@ function relay = get_relays(ps,mode,opt)
 C = psconstants;
 m = size(ps.branch,1);
 n_shunt = size(ps.shunt,1);
+n_gfl = 0;
+if isfield(ps,'gfl') && ~isempty(ps.gfl)
+    n_gfl = size(ps.gfl,1);
+end
 % n_macs = size(ps.gen,1);
 if nargin<3, opt=psoptions; end
 if nargin<2, mode='all'; end
@@ -62,6 +66,39 @@ switch mode
         relay(:,C.re.threshold) = y_threshold;
         relay(:,C.re.tripped)   = 0;
         relay(:,C.re.id)        = 1:m;
+    case 'gfl_uv'
+        if ~isfield(ps,'gfl') || isempty(ps.gfl)
+            relay = zeros(0,C.relay.cols);
+            return
+        end
+        relay = zeros(n_gfl,C.relay.cols);
+        relay(:,C.re.type) = C.relay.gfl_uv;
+        relay(:,C.re.gfl_loc) = ps.gfl(:,C.gfl.idnum);
+        relay(:,C.re.threshold) = ps.gfl(:,C.gfl.Vtrip);
+        relay(:,C.re.tripped) = ~ps.gfl(:,C.gfl.status);
+        relay(:,C.re.id) = 1:n_gfl;
+    case 'gfl_oc'
+        if ~isfield(ps,'gfl') || isempty(ps.gfl)
+            relay = zeros(0,C.relay.cols);
+            return
+        end
+        relay = zeros(n_gfl,C.relay.cols);
+        relay(:,C.re.type) = C.relay.gfl_oc;
+        relay(:,C.re.gfl_loc) = ps.gfl(:,C.gfl.idnum);
+        relay(:,C.re.threshold) = ps.gfl(:,C.gfl.Imax);
+        relay(:,C.re.tripped) = ~ps.gfl(:,C.gfl.status);
+        relay(:,C.re.id) = 1:n_gfl;
+    case 'gfl_pll'
+        if ~isfield(ps,'gfl') || isempty(ps.gfl)
+            relay = zeros(0,C.relay.cols);
+            return
+        end
+        relay = zeros(n_gfl,C.relay.cols);
+        relay(:,C.re.type) = C.relay.gfl_pll;
+        relay(:,C.re.gfl_loc) = ps.gfl(:,C.gfl.idnum);
+        relay(:,C.re.threshold) = ps.gfl(:,C.gfl.wmax_dev);
+        relay(:,C.re.tripped) = ~ps.gfl(:,C.gfl.status);
+        relay(:,C.re.id) = 1:n_gfl;
     otherwise
         % make relays of all types
         relay_temp = get_relays(ps,'temperature',opt);
@@ -69,11 +106,16 @@ switch mode
         relay_uvls = get_relays(ps,'uvls',opt);
         relay_ufls = get_relays(ps,'ufls',opt);
         relay_dist = get_relays(ps,'distance',opt);
+        relay_gfl_uv = get_relays(ps,'gfl_uv',opt);
+        relay_gfl_oc = get_relays(ps,'gfl_oc',opt);
+        relay_gfl_pll = get_relays(ps,'gfl_pll',opt);
         relay = [relay_temp;
                  relay_oc;
                  relay_uvls;
                  relay_ufls;
-                 relay_dist;];
-        relay(:,C.re.id)        = 1:(3*m+2*n_shunt);
+                 relay_dist;
+                 relay_gfl_uv;
+                 relay_gfl_oc;
+                 relay_gfl_pll;];
+        relay(:,C.re.id)        = 1:(3*m+2*n_shunt+3*n_gfl);
 end
-
