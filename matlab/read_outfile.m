@@ -5,7 +5,11 @@ n  = size(ps.bus,1);
 ng = size(ps.gen,1);
 m  = size(ps.branch,1);
 n_sh = size(ps.shunt,1);
-ix   = get_indices(n,ng,m,n_sh,opt);
+n_gfl = 0;
+if isfield(ps,'gfl') && ~isempty(ps.gfl)
+    n_gfl = size(ps.gfl,1);
+end
+ix   = get_indices(n,ng,m,n_sh,opt,n_gfl);
 
 data = readmatrix(fname,'OutputType','double','FileType','text','NumHeaderLines',1);
 

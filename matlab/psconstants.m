@@ -325,6 +325,7 @@ if isempty(C)
     C.relay.gfl_uv = 7;      % gfl undervoltage trip relay (new)
     C.relay.gfl_oc = 8;      % gfl overcurrent trip relay (new)
     C.relay.gfl_pll = 9;     % gfl pll loss-of-lock relay (new)
+    C.relay.gfl_rocof = 10;  % gfl ROCOF trip relay (new)
     % relay columns
     C.relay.type            = 1;    %
     C.relay.setting1        = 2;    % setting 1

@@ -73,7 +73,7 @@ ps = updateps(ps);
 ps.relay = get_relays(ps,'all',opt);
 
 % initialize global relay states
-global t_delay t_prev_check dist2threshold state_a
+global t_delay t_prev_check dist2threshold state_a gfl_rocof_state
 n    = size(ps.bus,1);
 ng   = size(ps.mac,1);
 m    = size(ps.branch,1);
@@ -97,7 +97,7 @@ event(3,[C.ev.time C.ev.type C.ev.branch_loc]) = [close_t C.ev.close_branch bran
 event(4,[C.ev.time C.ev.type]) = [t_max C.ev.finish];
 
 % run simulation
-[outputs,~] = simgrid(ps,event,'sim_case9_gfl_voltage_dip_recovery_fixed',opt);
+[outputs,ps_end] = simgrid(ps,event,'sim_case9_gfl_voltage_dip_recovery_fixed',opt);
 
 % completion check: use outputs.t_simulated because CSV tails may be sparse after switching
 if ~outputs.success || ~isfield(outputs,'t_simulated') || isempty(outputs.t_simulated) || outputs.t_simulated(end) < (t_max - 1e-6)
@@ -114,27 +114,30 @@ if ~has_trip || ~has_close
     error('sim_case9_gfl_voltage_dip_recovery_fixed failed: missing trip/close event record for branch %d.',branch_id);
 end
 
-% inspect bus-voltage dip and recovery from the logged algebraic states
-if isempty(outputs.outfilename)
-    error('sim_case9_gfl_voltage_dip_recovery_fixed failed: no output file available for voltage checks.');
-end
-data = readmatrix(outputs.outfilename,'OutputType','double','FileType','text','NumHeaderLines',1);
-if isempty(data) || size(data,2) < (1 + ix.nx + ix.ny)
-    error('sim_case9_gfl_voltage_dip_recovery_fixed failed: output file missing state columns.');
-end
+% inspect voltage dip/recovery using algebraic proxy states around the switching events
+[x0,y0] = get_xy(ps,opt);
+v_pre = y0(ix.y.Vmag(ps.bus_i(monitor_bus)));
 
-t = data(:,1);
-vmag_col = 1 + ix.nx + ix.y.Vmag(ps.bus_i(monitor_bus));
-vmag = data(:,vmag_col);
-pre_idx = t < (trip_t - 0.01);
-dip_idx = t >= (trip_t + 0.01) & t < (close_t - 0.01);
-rec_idx = t >= (close_t + 0.05);
-if ~any(pre_idx) || ~any(dip_idx) || ~any(rec_idx)
-    error('sim_case9_gfl_voltage_dip_recovery_fixed failed: insufficient samples for voltage checks.');
+ps_trip = ps;
+ps_trip.event_record = [];
+[ps_trip,~] = process_event(ps_trip,event(2,:),opt);
+[ps_trip.Ybus,ps_trip.Yf,ps_trip.Yt,ps_trip.Yft,ps_trip.sh_ft] = getYbus(ps_trip,false);
+y_trip = solve_algebraic(trip_t,x0,y0,ps_trip,opt);
+if isempty(y_trip)
+    error('sim_case9_gfl_voltage_dip_recovery_fixed failed: could not solve algebraic state after branch trip.');
 end
-v_pre = mean(vmag(pre_idx));
-v_dip = min(vmag(dip_idx));
-v_rec = mean(vmag(rec_idx));
+v_dip = y_trip(ix.y.Vmag(ps_trip.bus_i(monitor_bus)));
+
+ps_close = ps_trip;
+ps_close.event_record = [];
+[ps_close,~] = process_event(ps_close,event(3,:),opt);
+[ps_close.Ybus,ps_close.Yf,ps_close.Yt,ps_close.Yft,ps_close.sh_ft] = getYbus(ps_close,false);
+y_close = solve_algebraic(close_t,x0,y_trip,ps_close,opt);
+if isempty(y_close)
+    error('sim_case9_gfl_voltage_dip_recovery_fixed failed: could not solve algebraic state after branch close.');
+end
+v_rec = y_close(ix.y.Vmag(ps_close.bus_i(monitor_bus)));
+
 if ~(v_dip < v_pre - 1e-4)
     error('sim_case9_gfl_voltage_dip_recovery_fixed failed: no voltage dip observed at bus %d (pre = %.6f, dip = %.6f).',monitor_bus,v_pre,v_dip);
 end
@@ -142,6 +145,10 @@ if ~(abs(v_rec - v_pre) <= max(5e-3,0.5*(v_pre - v_dip)))
     error('sim_case9_gfl_voltage_dip_recovery_fixed failed: voltage did not recover at bus %d (pre = %.6f, rec = %.6f).',monitor_bus,v_pre,v_rec);
 end
 
+gfl_results = plot_gfl_results(outputs,ps_end,opt,'gfl_id',1,'visible','off','save_plots',true);
+if ~isfile(gfl_results.png_file)
+    error('sim_case9_gfl_voltage_dip_recovery_fixed failed: GFL plot image was not created.');
+end
 fprintf(['sim_case9_gfl_voltage_dip_recovery_fixed passed: reached t = %.6f s, ' ...
-    'recorded branch %d trip/close, Vbus%d %.6f -> %.6f -> %.6f pu.\n'], ...
-    outputs.t_simulated(end),branch_id,monitor_bus,v_pre,v_dip,v_rec);
+    'recorded branch %d trip/close, Vbus%d %.6f -> %.6f -> %.6f pu; plot saved to %s.\n'], ...
+    outputs.t_simulated(end),branch_id,monitor_bus,v_pre,v_dip,v_rec,gfl_results.png_file);

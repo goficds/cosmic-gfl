@@ -1,5 +1,5 @@
 function [ output ] = auxiliary_function(local_id,ix,ps,opt)
-% usage: [ global_relay_id ] = auxiliary_funciton(local_id,ix,ps,opt)
+% usage: [ global_relay_id ] = auxiliary_funciton(local_id, 0, ps, opt)
 % output is the global relay id if the inputs are (local_id, 0)
 % output is the ix if the inputs are ([], 1)
 
@@ -13,6 +13,10 @@ elseif ix && isempty(local_id)
     ng          = size(ps.mac,1);
     m           = size(ps.branch,1);
     n_sh        = size(ps.shunt,1);
-    output      = get_indices(n,ng,m,n_sh,opt);
+    n_gfl       = 0;
+    if isfield(ps,'gfl') && ~isempty(ps.gfl)
+        n_gfl = size(ps.gfl,1);
+    end
+    output      = get_indices(n,ng,m,n_sh,opt,n_gfl);
 end
 end

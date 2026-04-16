@@ -99,6 +99,17 @@ switch mode
         relay(:,C.re.threshold) = ps.gfl(:,C.gfl.wmax_dev);
         relay(:,C.re.tripped) = ~ps.gfl(:,C.gfl.status);
         relay(:,C.re.id) = 1:n_gfl;
+    case 'gfl_rocof'
+        if ~isfield(ps,'gfl') || isempty(ps.gfl)
+            relay = zeros(0,C.relay.cols);
+            return
+        end
+        relay = zeros(n_gfl,C.relay.cols);
+        relay(:,C.re.type) = C.relay.gfl_rocof;
+        relay(:,C.re.gfl_loc) = ps.gfl(:,C.gfl.idnum);
+        relay(:,C.re.threshold) = opt.sim.gfl_rocof_limit;
+        relay(:,C.re.tripped) = ~ps.gfl(:,C.gfl.status);
+        relay(:,C.re.id) = 1:n_gfl;
     otherwise
         % make relays of all types
         relay_temp = get_relays(ps,'temperature',opt);
@@ -109,6 +120,7 @@ switch mode
         relay_gfl_uv = get_relays(ps,'gfl_uv',opt);
         relay_gfl_oc = get_relays(ps,'gfl_oc',opt);
         relay_gfl_pll = get_relays(ps,'gfl_pll',opt);
+        relay_gfl_rocof = get_relays(ps,'gfl_rocof',opt);
         relay = [relay_temp;
                  relay_oc;
                  relay_uvls;
@@ -116,6 +128,7 @@ switch mode
                  relay_dist;
                  relay_gfl_uv;
                  relay_gfl_oc;
-                 relay_gfl_pll;];
-        relay(:,C.re.id)        = 1:(3*m+2*n_shunt+3*n_gfl);
+                 relay_gfl_pll;
+                 relay_gfl_rocof;];
+        relay(:,C.re.id)        = 1:(3*m+2*n_shunt+4*n_gfl);
 end

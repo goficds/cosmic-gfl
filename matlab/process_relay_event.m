@@ -58,7 +58,7 @@ for i = 1:num_relay
             t_delay(glo_id) = opt.sim.ufls_tdelay_ini;
             t_prev_check(glo_id) = NaN;
         end
-    elseif relay_type(i) == C.relay.gfl_uv || relay_type(i) == C.relay.gfl_oc || relay_type(i) == C.relay.gfl_pll
+    elseif relay_type(i) == C.relay.gfl_uv || relay_type(i) == C.relay.gfl_oc || relay_type(i) == C.relay.gfl_pll || relay_type(i) == C.relay.gfl_rocof
         new_event(i,C.ev.time) = t_event;
         new_event(i,C.ev.type) = C.ev.trip_gfl;
         new_event(i,C.ev.gfl_loc) = relay_location(i);

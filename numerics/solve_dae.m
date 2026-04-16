@@ -269,6 +269,16 @@ while t0<t_final
                     t_prev_check(aux(rows(i),0)) = t_prev;
                 end
             end
+            % zero-delay relays should trigger immediately once active
+            if ~isempty(rows)
+                active_now = rows(t_delay(aux(rows,0))<=0);
+                if ~isempty(active_now)
+                    Z = false(size(relay_event,1),1);
+                    Z(active_now) = true;
+                    t_delay(t_delay<0)=0;
+                    break
+                end
+            end
             % when it is below threshold, reduce the time delay until it hits 0
             if any(sign(z1(down_crossed_re)) == sign(z0_prev(down_crossed_re)))
                 crossed = find(down_crossed_re);

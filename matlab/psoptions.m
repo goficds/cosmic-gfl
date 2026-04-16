@@ -59,6 +59,8 @@ opt.sim.ufls_limit = 0.95;     % threshold at which under frequency load sheddin
 opt.sim.ufls_delta = 0.25;     % load shedding fraction
 opt.sim.zone1_distance = 0.9;  % zone 1 default distance (90% of line impedance)
 opt.sim.trip_gfl_only_island = false; % optional conservative first-version GFL-only island tripping
+opt.sim.gfl_rocof_limit = 2*pi*2;     % rad/s^2, minimum ROCOF threshold for GFL relay
+opt.sim.gfl_rocof_tdelay_ini = 0.05;  % sec, minimum ROCOF persistence before trip
 
 % legacy
 opt.simdc = opt.sim;

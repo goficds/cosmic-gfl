@@ -124,5 +124,6 @@ index.re.dist = (1:n_branches) + n_branches + n_branches + n_shunts + n_shunts;
 index.re.gfl_uv = (1:n_gfl) + 3*n_branches + 2*n_shunts;
 index.re.gfl_oc = (1:n_gfl) + 3*n_branches + 2*n_shunts + n_gfl;
 index.re.gfl_pll = (1:n_gfl) + 3*n_branches + 2*n_shunts + 2*n_gfl;
-index.re.nrelay = 3*n_branches + 2*n_shunts + 3*n_gfl;
+index.re.gfl_rocof = (1:n_gfl) + 3*n_branches + 2*n_shunts + 3*n_gfl;
+index.re.nrelay = 3*n_branches + 2*n_shunts + 4*n_gfl;
 return

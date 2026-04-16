@@ -68,7 +68,7 @@ ps = updateps(ps);
 ps.relay = get_relays(ps,'all',opt);
 
 % initialize global relay states
-global t_delay t_prev_check dist2threshold state_a
+global t_delay t_prev_check dist2threshold state_a gfl_rocof_state
 n    = size(ps.bus,1);
 ng   = size(ps.mac,1);
 m    = size(ps.branch,1);
@@ -90,7 +90,7 @@ event(1,[C.ev.time C.ev.type]) = [0 C.ev.start];
 event(2,[C.ev.time C.ev.type]) = [t_max C.ev.finish];
 
 % run smoke simulation
-[outputs,~] = simgrid(ps,event,'sim_case9_gfl_small_pref',opt);
+[outputs,ps_end] = simgrid(ps,event,'sim_case9_gfl_small_pref',opt);
 
 % dedicated smoke-test post path (skip legacy read_outfile/plot layout)
 data = readmatrix(outputs.outfilename,'OutputType','double','FileType','text','NumHeaderLines',1);
@@ -98,4 +98,9 @@ t_last = data(end,1);
 if ~outputs.success || isnan(t_last) || t_last < (t_max - 1e-6)
     error('sim_case9_gfl_small_pref failed: t_last = %.6f, success = %d',t_last,outputs.success);
 end
-fprintf('sim_case9_gfl_small_pref passed: reached t = %.6f s\n',t_last);
+
+gfl_results = plot_gfl_results(outputs,ps_end,opt,'gfl_id',1,'visible','off','save_plots',true);
+if ~isfile(gfl_results.png_file)
+    error('sim_case9_gfl_small_pref failed: GFL plot image was not created.');
+end
+fprintf('sim_case9_gfl_small_pref passed: reached t = %.6f s; plot saved to %s\n',t_last,gfl_results.png_file);
